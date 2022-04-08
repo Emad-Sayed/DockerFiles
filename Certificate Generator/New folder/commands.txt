@@ -1,0 +1,2 @@
+openssl req -new -out myTLS.csr -key myTLS.key -config request_configuration.txt
+openssl x509 -req -days 365 -CA myRootCA.pem -CAkey myRootCA.key -CAcreateserial -in myTLS.csr -out myTLS.crt

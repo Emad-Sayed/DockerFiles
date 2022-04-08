@@ -1,0 +1,203 @@
+version: '2.2'
+services:
+  proxy:
+    image: nginx
+    restart: always
+    volumes:
+      - ./identity-server-volumes/nginx.conf:/etc/nginx/nginx.conf
+      - ./identity-server-volumes/default.conf:/etc/nginx/conf.d/default.conf
+      - ./identity-server-volumes/ssl:/etc/ssl
+    ports:
+      - 2101:2101
+      - 8110:8110
+      - 7010:7010
+      - 8081:8081
+      - 8082:8082
+      - 8084:8084
+    logging:
+      driver: json-file
+      options:
+        max-size: 20m
+        max-file: '10'
+    #networks:
+    #  proxy: null
+
+  rabbitmq:
+    image: rabbitmq:management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    #to uncomment
+    #volumes:
+    #  - "/home/iradmin/volumes/itqan-rabbitmq:/var/lib/rabbitmq"
+    hostname: itqan-rabbitmq
+
+  c_operation:
+    image: itqanhub.azurecr.io/command-operations:qc
+    command: dotnet commandCtrlWebUI.dll
+    volumes:
+     #- C:\Users\Emad\Desktop\Deploy\https:/https
+     - ./https:/https
+     - ./appsettingscommandoperation.json:/app/appsettings.json
+     - ./appsettingscommandoperationclient.json:/app/wwwroot/appsettings.json
+    depends_on:
+     - skoruba.identityserver4.sts.identity
+     - skoruba.identityserver4.admin.api
+     - rabbitmq
+    ports:
+      - "2201:443"
+      - "2200:80"
+    environment:
+      ASPNETCORE_URLS: "https://+:443;http://+80"
+      #ASPNETCORE_HTTPS_PORT: "2101"
+      ASPNETCORE_Kestrel__Certificates__Default__Password: "P@ssw0rd"
+      ASPNETCORE_Kestrel__Certificates__Default__Path: "/https/aspnetapp.pfx"
+      #ASPNETCORE_Kestrel__Certificates__Default__Path: "/https/UsersEmadDesktopDeploycommandCtrlWebUI.pfx"
+    #networks:
+    #  proxy: 
+    #    aliases:
+    #      - co.app
+  e-services:
+    image: itqanhub.azurecr.io/e-services:identity
+    command: dotnet eServices.WebUI.dll
+    volumes:
+     #- C:\Users\Emad\Desktop\Deploy\https:/https
+     - ./https:/https
+     - ./appsettingseservices.json:/app/appsettings.json
+    depends_on:
+     - skoruba.identityserver4.sts.identity
+     - skoruba.identityserver4.admin.api
+     - rabbitmq
+    ports:
+      - "8210:443"
+      - "8209:80"
+    environment:
+      ASPNETCORE_URLS: "https://+:443;http://+:80"
+      ASPNETCORE_HTTPS_PORT: 8110
+      ASPNETCORE_Kestrel__Certificates__Default__Password: "P@ssw0rd"
+      #ASPNETCORE_Kestrel__Certificates__Default__Path: "/https/UsersEmadDesktopDeploycommandCtrlWebUI.pfx"
+      ASPNETCORE_Kestrel__Certificates__Default__Path: "/https/aspnetapp.pfx"
+
+  audit:
+    image: itqanhub.azurecr.io/audit-api:http
+    command: dotnet APi.dll
+    volumes:
+     #- C:\Users\Emad\Desktop\Deploy\https:/https
+     #- ${HOME}/.aspnet/https:/https
+     - ./appsettingsapiauditing.json:/app/appsettings.json
+    #ports:
+      #- "2010:5000"
+      #- "2011:5001"
+
+    #environment:
+      #ASPNETCORE_URLS: "https://+;http://+"
+      #ASPNETCORE_HTTPS_PORT: 2011
+      #ASPNETCORE_Kestrel__Certificates__Default__Password: "P@ssw0rd"
+      #ASPNETCORE_Kestrel__Certificates__Default__Path: "/https/aspnetapp.pfx"
+      #ASPNETCORE_Kestrel__Certificates__Default__Path: "/https/UsersEmadDesktopDeploycommandCtrlWebUI.pfx"
+
+  notificationgateway:
+    image: rtest
+    #image: itqanhub.azurecr.io/notificationgateway:qc
+    command: dotnet commandCtrlWebUI.dll
+    volumes:
+     - ./https:/https
+     - ./appsettingsnotificationgateway.json:/app/appsettings.json
+     #- './identity-server-volumes/cacerts.crt:/usr/local/share/ca-certificates/cacerts.crt'  
+    ports:
+     - "2030:80"
+     - "2003:443"
+    environment:
+      ASPNETCORE_URLS: "https://+:443;http://+:80"
+      #ASPNETCORE_HTTPS_PORT: 2003
+      ASPNETCORE_Kestrel__Certificates__Default__Password: "P@ssw0rd"
+      #ASPNETCORE_Kestrel__Certificates__Default__Path: "/https/UsersEmadDesktopDeploycommandCtrlWebUI.pfx"
+      ASPNETCORE_Kestrel__Certificates__Default__Path: "/https/aspnetapp.pfx"
+    #networks:
+    #  proxy: 
+    #    aliases:
+    #      - notification.gateway
+  skoruba.identityserver4.admin:
+    image: 'itqanhub.azurecr.io/identityservice-admin:qc'
+    environment:
+      - VIRTUAL_HOST=admin.skoruba.local
+      - 'ConnectionStrings__ConfigurationDbConnection=Server=40.65.99.236;Port=5432;User Id=dotnet; Password=Abc123**;Database=identity-server-01-14-2022-test;'
+      - 'ConnectionStrings__PersistedGrantDbConnection=Server=40.65.99.236;Port=5432;User Id=dotnet; Password=Abc123**;Database=identity-server-01-14-2022-test;'
+      - 'ConnectionStrings__IdentityDbConnection=Server=40.65.99.236;Port=5432;User Id=dotnet; Password=Abc123**;Database=identity-server-01-14-2022-test;'
+      - 'ConnectionStrings__AdminLogDbConnection=Server=40.65.99.236;Port=5432;User Id=dotnet; Password=Abc123**;Database=identity-server-01-14-2022-test;'
+      - 'ConnectionStrings__AdminAuditLogDbConnection=Server=40.65.99.236;Port=5432;User Id=dotnet; Password=Abc123**;Database=identity-server-01-14-2022-test;'
+      - 'ConnectionStrings__DataProtectionDbConnection=Server=40.65.99.236;Port=5432;User Id=dotnet; Password=Abc123**;Database=identity-server-01-14-2022-test;'
+      - 'AdminConfiguration__IdentityAdminBaseUrl=https://40.65.99.236:8082'
+      - 'AdminConfiguration__IdentityAdminRedirectUri=https://40.65.99.236:8082/signin-oidc'
+      - 'AdminConfiguration__IdentityServerBaseUrl=https://40.65.99.236:8081'
+      - AdminConfiguration__RequireHttpsMetadata=false
+      - 'IdentityServerData__Clients__0__ClientUri=https://40.65.99.236:8082'
+      - 'IdentityServerData__Clients__0__RedirectUris__0=https://40.65.99.236:8082/signin-oidc'
+      - 'IdentityServerData__Clients__0__FrontChannelLogoutUri=https://40.65.99.236:8082/signin-oidc'
+      - 'IdentityServerData__Clients__0__PostLogoutRedirectUris__0=https://40.65.99.236:8082/signout-callback-oidc'
+      - 'IdentityServerData__Clients__0__AllowedCorsOrigins__0=https://40.65.99.236:8082'
+      - 'IdentityServerData__Clients__1__RedirectUris__0=https://40.65.99.236:8084/swagger/oauth2-redirect.html'
+      - 'Serilog__WriteTo__1__Args__connectionString=Server=40.65.99.236;Port=5432;User Id=dotnet; Password=Abc123**;Database=identity-server-01-14-2022-test;'
+      - DockerConfiguration__UpdateCaCertificate=true
+      - ASPNETCORE_ENVIRONMENT=Development
+    command: dotnet Skoruba.IdentityServer4.Admin.dll /seed
+    depends_on:
+      - skoruba.identityserver4.sts.identity
+    volumes:
+      - './identity-server-volumes/serilog.json:/app/serilog.json'
+      - './identity-server-volumes/identitydata.json:/app/identitydata.json'
+      - './identity-server-volumes/identityserverdata.json:/app/identityserverdata.json'
+      - './identity-server-volumes/cacerts.crt:/usr/local/share/ca-certificates/cacerts.crt'
+    #networks:
+    #  proxy: 
+    #    aliases:
+    #      - admin.skoruba.local
+  skoruba.identityserver4.admin.api:
+    image: 'itqanhub.azurecr.io/identityservice-admin-api:qc'
+    environment:
+      - VIRTUAL_HOST=admin-api.skoruba.local
+      - AdminApiConfiguration__RequireHttpsMetadata=false
+      - 'AdminApiConfiguration__ApiBaseUrl=https://40.65.99.236:8084'
+      - 'AdminApiConfiguration__IdentityServerBaseUrl=https://40.65.99.236:8081'
+      - 'ConnectionStrings__ConfigurationDbConnection=Server=40.65.99.236;Port=5432;User Id=dotnet; Password=Abc123**;Database=identity-server-01-14-2022-test;'
+      - 'ConnectionStrings__PersistedGrantDbConnection=Server=40.65.99.236;Port=5432;User Id=dotnet; Password=Abc123**;Database=identity-server-01-14-2022-test;'
+      - 'ConnectionStrings__IdentityDbConnection=Server=40.65.99.236;Port=5432;User Id=dotnet; Password=Abc123**;Database=identity-server-01-14-2022-test;'
+      - 'ConnectionStrings__AdminLogDbConnection=Server=40.65.99.236;Port=5432;User Id=dotnet; Password=Abc123**;Database=identity-server-01-14-2022-test;'
+      - 'ConnectionStrings__AdminAuditLogDbConnection=Server=40.65.99.236;Port=5432;User Id=dotnet; Password=Abc123**;Database=identity-server-01-14-2022-test;'
+      - 'ConnectionStrings__DataProtectionDbConnection=Server=40.65.99.236;Port=5432;User Id=dotnet; Password=Abc123**;Database=identity-server-01-14-2022-test;'
+      - DockerConfiguration__UpdateCaCertificate=true
+      - ASPNETCORE_ENVIRONMENT=Development
+    volumes:
+      - './identity-server-volumes/serilog.json:/app/serilog.json'
+      - './identity-server-volumes/cacerts.crt:/usr/local/share/ca-certificates/cacerts.crt'
+    #networks:
+    #  proxy: 
+    #    aliases:
+    #      - admin-api.skoruba.local
+  skoruba.identityserver4.sts.identity:
+    image: 'itqanhub.azurecr.io/identityservice-sts:qc'
+    #build:
+    #  context: .
+    #  dockerfile: src/Skoruba.IdentityServer4.STS.Identity/Dockerfile
+    container_name: skoruba-identityserver4-sts-identity
+    environment:
+      - VIRTUAL_HOST=sts.skoruba.local
+      - 'ConnectionStrings__ConfigurationDbConnection=Server=40.65.99.236;Port=5432;User Id=dotnet; Password=Abc123**;Database=identity-server-01-14-2022-test;'
+      - 'ConnectionStrings__PersistedGrantDbConnection=Server=40.65.99.236;Port=5432;User Id=dotnet; Password=Abc123**;Database=identity-server-01-14-2022-test;'
+      - 'ConnectionStrings__IdentityDbConnection=Server=40.65.99.236;Port=5432;User Id=dotnet; Password=Abc123**;Database=identity-server-01-14-2022-test;'
+      - 'ConnectionStrings__DataProtectionDbConnection=Server=40.65.99.236;Port=5432;User Id=dotnet; Password=Abc123**;Database=identity-server-01-14-2022-test;'
+      - 'AdminConfiguration__IdentityAdminBaseUrl=https://40.65.99.236:8082'
+      - 'AdvancedConfiguration__IssuerUri=https://40.65.99.236:8081'
+      - DockerConfiguration__UpdateCaCertificate=true
+      - ASPNETCORE_ENVIRONMENT=Development
+    volumes:
+      - './identity-server-volumes/serilog.json:/app/serilog.json'
+      - './identity-server-volumes/cacerts.crt:/usr/local/share/ca-certificates/cacerts.crt'
+    #networks:
+    #  proxy:
+    #    aliases:
+    #      - sts.skoruba.local
+
+#networks:
+#  proxy:
+#    driver: bridge
